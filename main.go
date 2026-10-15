@@ -28,14 +28,6 @@ var rootCmd = &cobra.Command{
 	Use:   "gh",
 	Short: "GhistInTime - global history tracker",
 	RunE:  dumpAll,
-	//PreRunE: func(cmd *cobra.Command, args []string) error {
-	//	if formatFlag != "" {
-	//		if !slices.Contains(allowedFormats, formatFlag) {
-	//			return fmt.Errorf("invalid format %q: must be one of %v", formatFlag, allowedFormats)
-	//		}
-	//	}
-	//	return nil
-	//},
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 
 		if dbFile == "" {
@@ -82,20 +74,6 @@ var addCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	RunE:  addLine}
 
-//var dumpCmd = &cobra.Command{
-//	Use:   "dump",
-//	Short: "Dump all",
-//	RunE:  dumpAll,
-//	PreRunE: func(cmd *cobra.Command, args []string) error {
-//		if formatFlag != "" {
-//			if !slices.Contains(allowedFormats, formatFlag) {
-//				return fmt.Errorf("invalid format %q: must be one of %v", formatFlag, allowedFormats)
-//			}
-//		}
-//		return nil
-//	},
-//}
-
 func addLine(cmd *cobra.Command, args []string) error {
 	deleteOld := "DELETE FROM ghist WHERE command = ?"
 	line := strings.TrimSpace(args[0])
@@ -112,33 +90,14 @@ func addLine(cmd *cobra.Command, args []string) error {
 }
 
 func dumpAll(cmd *cobra.Command, args []string) error {
-	var limStr string
-	//if formatFlag == "long" {
-	//	colStr = "id, datetime(inserted, 'unixepoch', 'localtime') as dt, command"
-	//} else if formatFlag == "dt" {
-	//	colStr = "datetime(inserted, 'unixepoch', 'localtime') as dt, id, command"
-	//} else {
-	//	colStr = "id, command"
-	//}
-	//cols := []string{"command"}
-	//if showID {
-	//	cols = append([]string{"id"}, cols...)
-	//}
-	//if showDateTime {
-	//	cols = append([]string{ "datetime(inserted, 'unixepoch', 'localtime') as dt"}, cols...)
-	//}
-	//colStr = strings.Join(cols, ",")
+	var frmStr string
 
-	//..colStr = "datetime(inserted, 'unixepoch', 'localtime') as dt, id, command"
 	if limitFlag >= 0 {
-		limStr = fmt.Sprintf("LIMIT %d", limitFlag)
+		frmStr = fmt.Sprintf("(SELECT * FROM ghist ORDER BY id DESC LIMIT %d)", limitFlag)
+	} else {
+		frmStr = "ghist"
 	}
-	query := fmt.Sprintf(`
-	SELECT %s
-	FROM ghist
-	ORDER BY id
-	%s
-	`, ColStr(), limStr)
+	query := fmt.Sprintf(" SELECT %s FROM %s ORDER BY id", ColStr(), frmStr)
 
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
@@ -154,11 +113,6 @@ func dumpAll(cmd *cobra.Command, args []string) error {
 	// Set up tabwriter directly writing to stdout: minwidth, tabwidth, padding, padchar, flags
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
 	defer w.Flush()
-
-	// Print headers tab-separated
-	//if formatFlag == "" {
-	//	fmt.Fprintln(w, strings.Join(cols, "\t"))
-	//}
 
 	values := make([]interface{}, len(cols))
 	valuePtrs := make([]interface{}, len(cols))
@@ -201,16 +155,12 @@ func ColStr() string {
 
 func init() {
 	rootCmd.AddCommand(addCmd)
-	//rootCmd.AddCommand(dumpCmd)
 
 	rootCmd.PersistentFlags().StringVarP(&dbFile, "db", "", "", "Database")
 
-	//rootCmd.Flags().StringVarP(&formatFlag, "fmt", "f", "", "Format")
 	rootCmd.Flags().IntVarP(&limitFlag, "limit", "l", -1, "Format")
 	rootCmd.Flags().BoolVarP(&showDateTime, "dt", "d", false, "Format")
 	rootCmd.Flags().BoolVarP(&showID, "id", "i", false, "Format")
-
-	//_ = rootCmd.MarkPersistentFlagRequired("db")
 }
 
 func main() {
