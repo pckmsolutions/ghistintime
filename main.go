@@ -21,6 +21,7 @@ var (
 	db             *sql.DB
 	formatFlag     string
 	allowedFormats = []string{"hist", "histtime"}
+	limitFlag      int
 )
 
 var rootCmd = &cobra.Command{
@@ -79,12 +80,13 @@ var dumpCmd = &cobra.Command{
 
 func addLine(cmd *cobra.Command, args []string) error {
 	deleteOld := "DELETE FROM ghist WHERE command = ?"
-	if _, err := db.ExecContext(ctx, deleteOld, args[0]); err != nil {
+	line := strings.TrimSpace(args[0])
+	if _, err := db.ExecContext(ctx, deleteOld, line); err != nil {
 		slog.Error(fmt.Sprintf("Failed to delete from table: %v", err))
 		return err
 	}
 	insertNew := "INSERT INTO ghist(command, inserted) VALUES(?, strftime('%s','now'))"
-	if _, err := db.ExecContext(ctx, insertNew, args[0]); err != nil {
+	if _, err := db.ExecContext(ctx, insertNew, line); err != nil {
 		slog.Error(fmt.Sprintf("Failed to add new row to table: %v", err))
 		return err
 	}
@@ -92,19 +94,26 @@ func addLine(cmd *cobra.Command, args []string) error {
 }
 
 func dumpAll(cmd *cobra.Command, args []string) error {
-	var colStr string
+	var (
+		colStr string
+		limStr string
+	)
 	if formatFlag == "hist" {
 		colStr = "id, command"
 	} else if formatFlag == "histtime" {
 		colStr = "datetime(inserted, 'unixepoch', 'localtime') as dt, id, command"
 	} else {
-		colStr = "command, id, datetime(inserted, 'unixepoch', 'localtime') as dt"
+		colStr = "id, datetime(inserted, 'unixepoch', 'localtime') as dt, command"
+	}
+	if limitFlag >= 0 {
+		limStr = fmt.Sprintf("LIMIT %d", limitFlag)
 	}
 	query := fmt.Sprintf(`
 	SELECT %s
 	FROM ghist
 	ORDER BY id
-	`, colStr)
+	%s
+	`, colStr, limStr)
 
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
@@ -161,6 +170,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&dbFile, "db", "", "", "Database")
 
 	dumpCmd.Flags().StringVarP(&formatFlag, "fmt", "f", "", "Format")
+	dumpCmd.Flags().IntVarP(&limitFlag, "limit", "l", -1, "Format")
 
 	_ = rootCmd.MarkPersistentFlagRequired("db")
 }
