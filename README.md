@@ -31,7 +31,7 @@
 Clone the repository and compile the binary:
 
 ```bash
-git clone https://github.com/your-username/ghist.git
+git clone https://github.com/pckmsolutions/ghistintime.git
 cd ghist
 go build -o gh main.go
 
